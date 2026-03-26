@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>US Suicide Risk — Predictive Choropleth Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Syne+Mono&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root { --bg:#0f1117; --surface:#181c27; --border:#252a38; --text:#e8eaf0; --muted:#6b7280; }
+  body { background:var(--bg); color:var(--text); font-family:'Syne',sans-serif;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:2rem 1rem 3rem; }
+  h1 { font-size:clamp(1.4rem,3vw,2.4rem); font-weight:800; letter-spacing:-0.02em; text-align:center; margin-bottom:0.25rem; }
+  .subtitle { font-size:0.76rem; color:var(--muted); text-align:center; margin-bottom:1.2rem; letter-spacing:0.05em; }
+  .stats-bar { display:flex; gap:0.6rem; flex-wrap:wrap; justify-content:center; margin-bottom:1.2rem; max-width:980px; width:100%; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px 16px; text-align:center; }
+  .stat-val { font-size:1.2rem; font-weight:800; font-family:'Syne Mono',monospace; }
+  .stat-label { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-top:1px; }
+  .stat-warn { background:#1a1020; border:1px solid #3d1f2e; max-width:300px; font-size:0.7rem; color:#aaa; line-height:1.5; padding:8px 14px; border-radius:6px; text-align:left; }
+  .section-label { font-size:0.63rem; text-transform:uppercase; letter-spacing:0.15em; color:var(--muted); margin-bottom:0.4rem; padding-left:2px; width:100%; max-width:980px; }
+  .metrics-outer { width:100%; max-width:980px; margin-bottom:1rem; }
+  .metrics-row { display:grid; gap:0.5rem; margin-bottom:0.5rem; }
+  .metrics-row.row-5 { grid-template-columns:repeat(5,1fr); }
+  .metrics-row.row-2 { grid-template-columns:repeat(2,1fr); }
+  @media(max-width:700px) { .metrics-row.row-5 { grid-template-columns:repeat(3,1fr); } .metrics-row.row-2 { grid-template-columns:repeat(2,1fr); } }
+  @media(max-width:480px) { .metrics-row.row-5,.metrics-row.row-2 { grid-template-columns:repeat(2,1fr); } }
+  .metric-card { background:var(--surface); border:1.5px solid var(--border); border-radius:8px; padding:10px 12px; cursor:pointer; transition:all 0.15s; position:relative; overflow:hidden; }
+  .metric-card::before { content:''; position:absolute; inset:0; opacity:0; transition:opacity 0.15s; background:currentColor; }
+  .metric-card.active { border-color:currentColor; }
+  .metric-card.active::before { opacity:0.07; }
+  .metric-card:hover { transform:translateY(-1px); }
+  .card-top { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+  .card-icon { font-size:0.95rem; }
+  .card-name { font-size:0.64rem; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted); flex:1; }
+  .card-badge { font-size:0.55rem; padding:1px 5px; border-radius:3px; text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap; }
+  .badge-composite { background:#1e2d1e; color:#34d399; border:1px solid #1a3d1a; }
+  .badge-predictive { background:#2d1e2e; color:#c084fc; border:1px solid #3d1a3e; }
+  .card-val { font-size:1.0rem; font-weight:700; font-family:'Syne Mono',monospace; }
+  .controls-row { display:flex; gap:0.5rem; margin-bottom:0.8rem; justify-content:flex-end; max-width:980px; width:100%; align-items:center; }
+  .ctrl-label { font-size:0.68rem; color:var(--muted); margin-right:4px; }
+  .btn { background:transparent; border:1px solid var(--border); color:var(--muted); padding:4px 11px; font-family:'Syne',sans-serif; font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; border-radius:4px; transition:all 0.15s; }
+  .btn.active,.btn:hover { border-color:#818cf8; color:#818cf8; }
+  #map-wrap { width:100%; max-width:980px; position:relative; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:0.75rem; }
+  svg { width:100%; height:auto; display:block; }
+  .state { stroke:#0f1117; stroke-width:0.6; transition:fill 0.35s ease, stroke-width 0.1s; cursor:pointer; }
+  .state:hover { stroke:#fff; stroke-width:1.5; }
+  .state.no-data { fill:#1c2030 !important; opacity:0.45; }
+  .tooltip { position:absolute; background:#1a1e2e; border:1px solid #2e3650; border-radius:7px; padding:11px 14px; pointer-events:none; opacity:0; transition:opacity 0.1s; font-size:0.8rem; line-height:1.8; white-space:nowrap; box-shadow:0 10px 40px rgba(0,0,0,0.6); z-index:10; }
+  .t-state { font-size:0.95rem; font-weight:700; display:block; margin-bottom:2px; }
+  .t-val { font-family:'Syne Mono',monospace; font-size:0.88rem; }
+  .t-rank { color:var(--muted); font-size:0.7rem; }
+  .t-divider { border:none; border-top:1px solid #252a38; margin:6px 0; }
+  .risk-pill { display:inline-block; padding:2px 8px; border-radius:3px; font-size:0.7rem; font-weight:700; }
+  .legend-row { display:flex; align-items:center; justify-content:space-between; margin-top:0.75rem; font-size:0.7rem; color:var(--muted); padding:0 2px; }
+  .legend-wrap { display:flex; align-items:center; gap:8px; }
+  .pred-legend { display:none; gap:0.75rem; flex-wrap:wrap; justify-content:center; margin-top:0.6rem; font-size:0.7rem; }
+  .pred-item { display:flex; align-items:center; gap:5px; color:var(--muted); }
+  .pred-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .source-note { margin-top:1.5rem; font-size:0.67rem; color:#3a3f52; text-align:center; max-width:720px; line-height:1.8; }
+</style>
+</head>
+<body>
+
+<h1>US Suicide Risk Intelligence Dashboard</h1>
+<p class="subtitle">7-layer analysis · Enriched social signal + Socioeconomic indices + Predictive model</p>
+
+<div class="stats-bar">
+  <div class="stat"><div class="stat-val" style="color:#e05b7f">5,906</div><div class="stat-label">Posts w/ Signal</div></div>
+  <div class="stat"><div class="stat-val" style="color:#e05b7f">63%</div><div class="stat-label">Inclusion Rate</div></div>
+  <div class="stat"><div class="stat-val" style="color:#fb923c">r = –0.08</div><div class="stat-label">Socioeconomic vs CDC</div></div>
+  <div class="stat"><div class="stat-val" style="color:#c084fc">r = 0.42</div><div class="stat-label">Predictive vs CDC</div></div>
+  <div class="stat-warn">⚠️ Indiana &amp; Maine are data collection outliers. Post signal is sparse across most states — use as supplemental evidence, not primary indicator.</div>
+</div>
+
+<div class="metrics-outer">
+  <div class="section-label">► Individual Indicators — click to explore each layer</div>
+  <div class="metrics-row row-5" id="cards-row1"></div>
+  <div class="section-label">► Composite &amp; Predictive Models</div>
+  <div class="metrics-row row-2" id="cards-row2"></div>
+</div>
+
+<div class="controls-row">
+  <span class="ctrl-label">Scale:</span>
+  <button class="btn active" id="btn-log">Log</button>
+  <button class="btn" id="btn-linear">Linear</button>
+</div>
+
+<div id="map-wrap">
+  <svg id="map" viewBox="0 0 960 600"></svg>
+  <div class="tooltip" id="tooltip"></div>
+  <div class="legend-row">
+    <span id="leg-lo">Low</span>
+    <div class="legend-wrap"><canvas id="legend-canvas" width="220" height="10"></canvas></div>
+    <span id="leg-hi">High</span>
+  </div>
+</div>
+
+<div class="pred-legend" id="pred-legend">
+  <div class="pred-item"><div class="pred-dot" style="background:#ffd5d5"></div>Lower Risk (&lt; p25)</div>
+  <div class="pred-item"><div class="pred-dot" style="background:#d97070"></div>Moderate (p25–p50)</div>
+  <div class="pred-item"><div class="pred-dot" style="background:#9b2020"></div>High (p50–p75)</div>
+  <div class="pred-item"><div class="pred-dot" style="background:#5c0000"></div>Critical (&gt; p75)</div>
+</div>
+
+<p class="source-note">
+  <strong>Post Signal:</strong> 5,906 posts scored via 4-tier NLP keyword taxonomy (Tier 1: direct suicidal ideation · Tier 2: passive ideation · Tier 3: mental health crisis · Tier 4: risk factors). Log-normalized per 100k population.<br>
+  <strong>Socioeconomic Composite:</strong> Equal-weight average of min-max normalized Gini (ACS 2022), Unemployment (BLS 2024), and % adults without bachelor's degree (ACS 2023).<br>
+  <strong>Predictive Model:</strong> 60% socioeconomic + 20% post signal + 20% current CDC rate. Achieved r = 0.42 vs CDC 2023 state suicide rates.<br>
+  <strong>Suicide Rate:</strong> CDC NCHS NVSS age-adjusted, per 100,000 (Data Brief No. 541, Sept 2025). National trend 2003–2023.<br>
+  If you or someone you know is struggling — call or text <strong style="color:#f87171">988</strong> (Suicide &amp; Crisis Lifeline), 24/7.
+</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const POST_INDEX={"Alabama":0.3139,"Alaska":0.0,"Arizona":0.014,"Arkansas":0.0,"California":0.109,"Colorado":0.3249,"Connecticut":0.051,"Delaware":0.1722,"Florida":0.0959,"Georgia":0.044,"Hawaii":0.7784,"Idaho":0.5544,"Illinois":0.0762,"Indiana":1.0,"Iowa":0.0,"Kansas":0.0,"Kentucky":0.0,"Louisiana":0.0,"Maine":0.9738,"Maryland":0.0,"Massachusetts":0.0572,"Michigan":0.0,"Minnesota":0.0026,"Mississippi":0.0872,"Missouri":0.0,"Montana":0.0,"Nebraska":0.1725,"Nevada":0.1779,"New Hampshire":0.2657,"New Jersey":0.0,"New Mexico":0.0,"New York":0.1845,"North Carolina":0.0043,"North Dakota":0.0506,"Ohio":0.0505,"Oklahoma":0.0677,"Oregon":0.4955,"Pennsylvania":0.0,"Rhode Island":0.0,"South Carolina":0.0029,"South Dakota":0.0,"Tennessee":0.0,"Texas":0.1656,"Utah":0.2702,"Vermont":0.0,"Virginia":0.0,"Washington":0.0448,"West Virginia":0.0,"Wisconsin":0.0587,"Wyoming":0.2786};
+const POST_RAW={"Alabama":6.48,"Alaska":0,"Arizona":0.094,"Arkansas":0,"California":1.011,"Colorado":7.027,"Connecticut":0.387,"Delaware":2.017,"Florida":0.849,"Georgia":0.326,"Hawaii":145.993,"Idaho":33.961,"Illinois":0.63,"Indiana":607.52,"Iowa":0,"Kansas":0,"Kentucky":0,"Louisiana":0,"Maine":513.405,"Maryland":0,"Massachusetts":0.443,"Michigan":0,"Minnesota":0.017,"Mississippi":0.749,"Missouri":0,"Montana":0,"Nebraska":2.022,"Nevada":2.129,"New Hampshire":4.494,"New Jersey":0,"New Mexico":0,"New York":2.264,"North Carolina":0.028,"North Dakota":0.383,"Ohio":0.382,"Oklahoma":0.543,"Oregon":22.962,"Pennsylvania":0,"Rhode Island":0,"South Carolina":0.019,"South Dakota":0,"Tennessee":0,"Texas":1.892,"Utah":4.653,"Vermont":0,"Virginia":0,"Washington":0.333,"West Virginia":0,"Wisconsin":0.457,"Wyoming":4.966};
+const POST_COUNT={"Alabama":26,"Alaska":0,"Arizona":2,"Arkansas":0,"California":32,"Colorado":39,"Connecticut":2,"Delaware":3,"Florida":13,"Georgia":4,"Hawaii":175,"Idaho":55,"Illinois":8,"Indiana":4293,"Iowa":0,"Kansas":0,"Kentucky":0,"Louisiana":0,"Maine":967,"Maryland":0,"Massachusetts":6,"Michigan":0,"Minnesota":1,"Mississippi":1,"Missouri":0,"Montana":0,"Nebraska":3,"Nevada":7,"New Hampshire":5,"New Jersey":0,"New Mexico":0,"New York":33,"North Carolina":1,"North Dakota":1,"Ohio":12,"Oklahoma":5,"Oregon":151,"Pennsylvania":0,"Rhode Island":0,"South Carolina":1,"South Dakota":0,"Tennessee":0,"Texas":43,"Utah":12,"Vermont":0,"Virginia":0,"Washington":3,"West Virginia":0,"Wisconsin":1,"Wyoming":1};
+const POST_T1={"Alabama":84.6,"Alaska":0,"Arizona":50,"Arkansas":0,"California":75,"Colorado":66.7,"Connecticut":50,"Delaware":66.7,"Florida":92.3,"Georgia":50,"Hawaii":73.7,"Idaho":80,"Illinois":50,"Indiana":70.5,"Iowa":0,"Kansas":0,"Kentucky":0,"Louisiana":0,"Maine":68,"Maryland":0,"Massachusetts":16.7,"Michigan":0,"Minnesota":0,"Mississippi":100,"Missouri":0,"Montana":0,"Nebraska":100,"Nevada":57.1,"New Hampshire":80,"New Jersey":0,"New Mexico":0,"New York":81.8,"North Carolina":0,"North Dakota":0,"Ohio":41.7,"Oklahoma":40,"Oregon":72.2,"Pennsylvania":0,"Rhode Island":0,"South Carolina":0,"South Dakota":0,"Tennessee":0,"Texas":88.4,"Utah":58.3,"Vermont":0,"Virginia":0,"Washington":66.7,"West Virginia":0,"Wisconsin":100,"Wyoming":100};
+const SOCIO={"Alabama":0.5697,"Alaska":0.4709,"Arizona":0.559,"Arkansas":0.6068,"California":0.6966,"Colorado":0.3467,"Connecticut":0.5168,"Delaware":0.4598,"Florida":0.5325,"Georgia":0.5092,"Hawaii":0.3313,"Idaho":0.3944,"Illinois":0.6009,"Indiana":0.4978,"Iowa":0.3507,"Kansas":0.3696,"Kentucky":0.6562,"Louisiana":0.7105,"Maine":0.3393,"Maryland":0.2451,"Massachusetts":0.4282,"Michigan":0.5646,"Minnesota":0.312,"Mississippi":0.7124,"Missouri":0.5078,"Montana":0.3547,"Nebraska":0.2708,"Nevada":0.7426,"New Hampshire":0.1554,"New Jersey":0.4722,"New Mexico":0.6022,"New York":0.6663,"North Carolina":0.4984,"North Dakota":0.221,"Ohio":0.5645,"Oklahoma":0.5453,"Oregon":0.5222,"Pennsylvania":0.5081,"Rhode Island":0.4897,"South Carolina":0.5319,"South Dakota":0.294,"Tennessee":0.5565,"Texas":0.5693,"Utah":0.2588,"Vermont":0.1252,"Virginia":0.3165,"Washington":0.503,"West Virginia":0.7182,"Wisconsin":0.3561,"Wyoming":0.4467};
+const PRED={"Alabama":0.496,"Alaska":0.4825,"Arizona":0.4525,"Arkansas":0.4879,"California":0.4683,"Colorado":0.4035,"Connecticut":0.3384,"Delaware":0.3637,"Florida":0.4072,"Georgia":0.3867,"Hawaii":0.4316,"Idaho":0.5009,"Illinois":0.4205,"Indiana":0.592,"Iowa":0.2895,"Kansas":0.3399,"Kentucky":0.4918,"Louisiana":0.5063,"Maine":0.506,"Maryland":0.1671,"Massachusetts":0.2817,"Michigan":0.4121,"Minnesota":0.2506,"Mississippi":0.5239,"Missouri":0.4075,"Montana":0.3976,"Nebraska":0.2665,"Nevada":0.6059,"New Hampshire":0.2169,"New Jersey":0.2833,"New Mexico":0.5099,"New York":0.4472,"North Carolina":0.3675,"North Dakota":0.2437,"Ohio":0.4202,"Oklahoma":0.4798,"Oregon":0.5286,"Pennsylvania":0.3725,"Rhode Island":0.3148,"South Carolina":0.3912,"South Dakota":0.305,"Tennessee":0.4301,"Texas":0.4414,"Utah":0.3455,"Vermont":0.1761,"Virginia":0.2509,"Washington":0.3917,"West Virginia":0.5395,"Wisconsin":0.2997,"Wyoming":0.5056};
+const GINI={"Alabama":0.4814,"Alaska":0.4282,"Arizona":0.4735,"Arkansas":0.4789,"California":0.4953,"Colorado":0.4644,"Connecticut":0.5008,"Delaware":0.4468,"Florida":0.4854,"Georgia":0.4836,"Hawaii":0.4390,"Idaho":0.4395,"Illinois":0.4820,"Indiana":0.4476,"Iowa":0.4377,"Kansas":0.4558,"Kentucky":0.4773,"Louisiana":0.4915,"Maine":0.4408,"Maryland":0.4565,"Massachusetts":0.4975,"Michigan":0.4660,"Minnesota":0.4473,"Mississippi":0.4786,"Missouri":0.4710,"Montana":0.4521,"Nebraska":0.4409,"Nevada":0.4638,"New Hampshire":0.4281,"New Jersey":0.4737,"New Mexico":0.4671,"New York":0.5208,"North Carolina":0.4742,"North Dakota":0.4238,"Ohio":0.4624,"Oklahoma":0.4744,"Oregon":0.4618,"Pennsylvania":0.4726,"Rhode Island":0.4627,"South Carolina":0.4693,"South Dakota":0.4385,"Tennessee":0.4805,"Texas":0.4779,"Utah":0.4198,"Vermont":0.4342,"Virginia":0.4710,"Washington":0.4651,"West Virginia":0.4599,"Wisconsin":0.4446,"Wyoming":0.4422};
+const UNEMP={"Alabama":3.1,"Alaska":4.3,"Arizona":3.9,"Arkansas":3.2,"California":5.3,"Colorado":3.7,"Connecticut":4.0,"Delaware":4.1,"Florida":3.3,"Georgia":3.4,"Hawaii":3.2,"Idaho":3.2,"Illinois":4.8,"Indiana":3.7,"Iowa":2.8,"Kansas":2.9,"Kentucky":4.0,"Louisiana":4.1,"Maine":3.0,"Maryland":2.9,"Massachusetts":3.8,"Michigan":4.2,"Minnesota":3.1,"Mississippi":4.1,"Missouri":3.5,"Montana":2.9,"Nebraska":2.5,"Nevada":5.4,"New Hampshire":2.5,"New Jersey":4.6,"New Mexico":4.2,"New York":4.4,"North Carolina":3.6,"North Dakota":2.1,"Ohio":4.2,"Oklahoma":3.1,"Oregon":4.5,"Pennsylvania":3.8,"Rhode Island":4.2,"South Carolina":3.6,"South Dakota":2.2,"Tennessee":3.4,"Texas":4.0,"Utah":3.2,"Vermont":2.3,"Virginia":2.9,"Washington":4.5,"West Virginia":4.6,"Wisconsin":2.9,"Wyoming":3.5};
+const EDUC={"Alabama":73.3,"Alaska":69.9,"Arizona":68.3,"Arkansas":76.0,"California":62.5,"Colorado":55.9,"Connecticut":57.4,"Delaware":65.9,"Florida":67.9,"Georgia":65.8,"Hawaii":65.0,"Idaho":69.7,"Illinois":62.4,"Indiana":71.7,"Iowa":69.9,"Kansas":66.0,"Kentucky":74.0,"Louisiana":73.8,"Maine":66.7,"Maryland":56.3,"Massachusetts":53.0,"Michigan":68.3,"Minnesota":62.2,"Mississippi":77.2,"Missouri":68.1,"Montana":65.8,"Nebraska":65.3,"Nevada":73.2,"New Hampshire":59.7,"New Jersey":56.2,"New Mexico":70.9,"New York":60.7,"North Carolina":65.8,"North Dakota":68.9,"Ohio":69.2,"Oklahoma":73.2,"Oregon":63.8,"Pennsylvania":65.4,"Rhode Island":63.4,"South Carolina":69.6,"South Dakota":70.0,"Tennessee":70.2,"Texas":67.2,"Utah":64.3,"Vermont":57.4,"Virginia":58.1,"Washington":61.5,"West Virginia":78.5,"Wisconsin":67.8,"Wyoming":70.7};
+const CDC={"Alabama":16.8,"Alaska":28.2,"Arizona":19.2,"Arkansas":20.2,"California":10.2,"Colorado":20.9,"Connecticut":9.1,"Delaware":12.8,"Florida":14.4,"Georgia":14.8,"Hawaii":15.3,"Idaho":23.3,"Illinois":11.9,"Indiana":17.0,"Iowa":15.5,"Kansas":19.6,"Kentucky":17.5,"Louisiana":15.6,"Maine":18.5,"Maryland":9.3,"Massachusetts":8.6,"Michigan":14.9,"Minnesota":13.8,"Mississippi":15.5,"Missouri":18.0,"Montana":26.6,"Nebraska":14.5,"Nevada":20.3,"New Hampshire":14.6,"New Jersey":7.2,"New Mexico":22.8,"New York":8.3,"North Carolina":14.3,"North Dakota":17.8,"Ohio":14.7,"Oklahoma":21.8,"Oregon":19.4,"Pennsylvania":14.3,"Rhode Island":9.4,"South Carolina":14.7,"South Dakota":20.7,"Tennessee":17.3,"Texas":14.2,"Utah":21.5,"Vermont":17.8,"Virginia":13.6,"Washington":15.7,"West Virginia":18.6,"Wisconsin":15.0,"Wyoming":26.3};
+const CDC_2022={"Alabama":16.3,"Alaska":27.6,"Arizona":20.6,"Arkansas":18.0,"California":10.4,"Colorado":21.1,"Connecticut":10.6,"Delaware":11.4,"Florida":14.1,"Georgia":14.6,"Hawaii":16.6,"Idaho":22.2,"Illinois":11.7,"Indiana":16.4,"Iowa":18.5,"Kansas":20.5,"Kentucky":18.0,"Louisiana":15.6,"Maine":17.7,"Maryland":9.5,"Massachusetts":8.3,"Michigan":14.7,"Minnesota":14.8,"Mississippi":14.0,"Missouri":19.1,"Montana":28.7,"Nebraska":15.6,"Nevada":21.0,"New Hampshire":16.6,"New Jersey":7.7,"New Mexico":24.7,"New York":8.5,"North Carolina":14.4,"North Dakota":22.5,"Ohio":15.0,"Oklahoma":21.4,"Oregon":19.3,"Pennsylvania":14.2,"Rhode Island":10.6,"South Carolina":15.4,"South Dakota":21.6,"Tennessee":16.7,"Texas":14.4,"Utah":22.1,"Vermont":18.0,"Virginia":13.3,"Washington":14.9,"West Virginia":18.3,"Wisconsin":15.1,"Wyoming":25.6};
+const TREND=[{year:2003,rate:10.8},{year:2004,rate:11.0},{year:2005,rate:10.9},{year:2006,rate:11.0},{year:2007,rate:11.3},{year:2008,rate:11.6},{year:2009,rate:11.8},{year:2010,rate:12.1},{year:2011,rate:12.3},{year:2012,rate:12.6},{year:2013,rate:12.6},{year:2014,rate:13.0},{year:2015,rate:13.3},{year:2016,rate:13.5},{year:2017,rate:14.0},{year:2018,rate:14.2},{year:2019,rate:13.9},{year:2020,rate:13.5},{year:2021,rate:14.1},{year:2022,rate:14.2},{year:2023,rate:14.1}];
+const PERCS={p25:0.31235,p50:0.40735,p75:0.488875};
+const STATE_IDS={"01":"Alabama","02":"Alaska","04":"Arizona","05":"Arkansas","06":"California","08":"Colorado","09":"Connecticut","10":"Delaware","12":"Florida","13":"Georgia","15":"Hawaii","16":"Idaho","17":"Illinois","18":"Indiana","19":"Iowa","20":"Kansas","21":"Kentucky","22":"Louisiana","23":"Maine","24":"Maryland","25":"Massachusetts","26":"Michigan","27":"Minnesota","28":"Mississippi","29":"Missouri","30":"Montana","31":"Nebraska","32":"Nevada","33":"New Hampshire","34":"New Jersey","35":"New Mexico","36":"New York","37":"North Carolina","38":"North Dakota","39":"Ohio","40":"Oklahoma","41":"Oregon","42":"Pennsylvania","44":"Rhode Island","45":"South Carolina","46":"South Dakota","47":"Tennessee","48":"Texas","49":"Utah","50":"Vermont","51":"Virginia","53":"Washington","54":"West Virginia","55":"Wisconsin","56":"Wyoming"};
+
+// ── METRIC CONFIG ─────────────────────────────────────────────────────────────
+const ROW1 = [
+  {id:"posts",  name:"Post Signal",   icon:"💬", color:"#e05b7f", unit:"score/100k",
+   format:v=>v>0?v.toFixed(3):"0", desc:"Severity-weighted MH/suicidal posts per 100k · 63% of posts included · 4-tier NLP", data:POST_INDEX},
+  {id:"gini",   name:"Gini Index",    icon:"⚖️", color:"#f59e0b", unit:"(0–1)",
+   format:v=>v.toFixed(4), desc:"Income inequality (ACS 2022) — higher = more unequal", data:GINI},
+  {id:"unemp",  name:"Unemployment",  icon:"📉", color:"#34d399", unit:"%",
+   format:v=>v.toFixed(1)+"%", desc:"Annual avg unemployment rate (BLS 2024)", data:UNEMP},
+  {id:"educ",   name:"No Degree %",   icon:"🎓", color:"#818cf8", unit:"% adults",
+   format:v=>v.toFixed(1)+"%", desc:"% adults without bachelor's — higher = lower education level (ACS 2023)", data:EDUC},
+  {id:"suicide",name:"Suicide Rate",  icon:"🎗️", color:"#f87171", unit:"per 100k",
+   format:v=>v.toFixed(1), desc:"Age-adjusted suicide rate per 100,000 (CDC NVSS 2023)", data:CDC},
+];
+const ROW2 = [
+  {id:"socio",  name:"Socioeconomic Risk Index", icon:"📊", color:"#fb923c", unit:"index", badge:"Composite", badgeClass:"badge-composite",
+   format:v=>v.toFixed(3), desc:"Equal-weight: Gini + Unemployment + Low Education (each min-max normalized 0→1)", data:SOCIO},
+  {id:"predictive", name:"Predictive Risk Score", icon:"🔮", color:"#c084fc", unit:"score", badge:"Predictive", badgeClass:"badge-predictive",
+   format:v=>v.toFixed(3), desc:"60% socioeconomic + 20% post signal + 20% CDC rate · r = 0.42 vs CDC 2023", data:PRED},
+];
+const ALL_METRICS = [...ROW1, ...ROW2];
+
+let active = ROW1[0];
+let useLog = true;
+let features = [];
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const colorInterp = t => d3.interpolateRgb("#ffd5d5","#8b0000")(t);
+
+function getScale(m) {
+  const vals = Object.values(m.data).filter(v=>v>0);
+  if (!vals.length) return d3.scaleLinear().domain([0,1]).range([0,1]);
+  const mn=Math.min(...vals), mx=Math.max(...vals);
+  if (useLog && mx/mn>5) return d3.scaleLog().domain([mn,mx]).range([0,1]).clamp(true);
+  return d3.scaleLinear().domain([mn,mx]).range([0,1]).clamp(true);
+}
+function drawLegend(m) {
+  const cv=document.getElementById('legend-canvas'), ctx=cv.getContext('2d');
+  for(let i=0;i<220;i++){ctx.fillStyle=colorInterp(i/220);ctx.fillRect(i,0,1,10);}
+  const vals=Object.values(m.data).filter(v=>v>0);
+  document.getElementById('leg-lo').textContent=vals.length?m.format(Math.min(...vals)):'0';
+  document.getElementById('leg-hi').textContent=vals.length?m.format(Math.max(...vals)):'1';
+}
+function riskLabel(v) {
+  if(v>=PERCS.p75) return {label:"🔴 Critical Risk", bg:"#3d0a0a", col:"#f87171"};
+  if(v>=PERCS.p50) return {label:"🟠 High Risk",     bg:"#2d1e0a", col:"#fb923c"};
+  if(v>=PERCS.p25) return {label:"🟡 Moderate Risk", bg:"#2d2a0a", col:"#fbbf24"};
+  return                   {label:"🟢 Lower Risk",    bg:"#0a1e0a", col:"#34d399"};
+}
+
+// ── CARDS ─────────────────────────────────────────────────────────────────────
+function buildCards() {
+  [[ROW1,'cards-row1'],[ROW2,'cards-row2']].forEach(([metrics,id]) => {
+    const cont=document.getElementById(id);
+    metrics.forEach(m => {
+      const vals=Object.values(m.data).filter(v=>v>0);
+      const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+      const el=document.createElement('div');
+      el.className='metric-card'+(m.id===active.id?' active':'');
+      el.style.color=m.color;
+      el.innerHTML=`
+        <div class="card-top">
+          <span class="card-icon">${m.icon}</span>
+          <span class="card-name">${m.name}</span>
+          ${m.badge?`<span class="card-badge ${m.badgeClass}">${m.badge}</span>`:''}
+        </div>
+        <div class="card-val" style="color:${m.color}">${m.format(avg)}</div>`;
+      el.addEventListener('click',()=>{
+        active=m;
+        document.querySelectorAll('.metric-card').forEach(c=>c.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('pred-legend').style.display=m.id==='predictive'?'flex':'none';
+        render();
+      });
+      cont.appendChild(el);
+    });
+  });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+const svg=d3.select("#map");
+const proj=d3.geoAlbersUsa().scale(1300).translate([487,305]);
+const geoPath=d3.geoPath().projection(proj);
+const tooltip=document.getElementById('tooltip');
+
+function render() {
+  const scale=getScale(active), data=active.data;
+  const sorted=Object.entries(data).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const rankMap={}; sorted.forEach(([k],i)=>rankMap[k]=i+1);
+
+  svg.selectAll(".state")
+    .transition().duration(350)
+    .attr("fill",d=>{const v=data[d.properties.name];return(!v||v<=0)?"#1c2030":colorInterp(scale(v));});
+
+  svg.selectAll(".state")
+    .classed("no-data",d=>{const v=data[d.properties.name];return!v||v<=0;})
+    .on("mousemove",function(event,d){
+      const name=d.properties.name, val=data[name];
+      const rect=document.getElementById('map-wrap').getBoundingClientRect();
+      tooltip.style.opacity=1;
+      tooltip.style.left=(event.clientX-rect.left+14)+"px";
+      tooltip.style.top=(event.clientY-rect.top-12)+"px";
+      const rank=rankMap[name];
+      let extra='';
+
+      if(active.id==='predictive'&&val){
+        const r=riskLabel(val);
+        extra=`<hr class="t-divider">
+          <span class="risk-pill" style="background:${r.bg};color:${r.col}">${r.label}</span><br>
+          <span class="t-rank">Socioeconomic index: ${(SOCIO[name]||0).toFixed(3)}</span><br>
+          <span class="t-rank">Post signal: ${(POST_INDEX[name]||0).toFixed(3)} &nbsp;·&nbsp; CDC rate: ${CDC[name]||'N/A'}/100k</span>`;
+      } else if(active.id==='socio'&&val){
+        extra=`<hr class="t-divider">
+          <span class="t-rank">Gini: ${(GINI[name]||0).toFixed(4)} &nbsp;·&nbsp; Unemp: ${UNEMP[name]||0}% &nbsp;·&nbsp; No Degree: ${EDUC[name]||0}%</span>`;
+      } else if(active.id==='posts'&&POST_COUNT[name]>0){
+        extra=`<hr class="t-divider">
+          <span class="t-rank">Posts w/ signal: ${POST_COUNT[name]} &nbsp;·&nbsp; Direct ideation (T1): ${POST_T1[name]}%</span><br>
+          <span class="t-rank">Weighted score/100k: ${(POST_RAW[name]||0).toFixed(2)}</span>`;
+      } else if(active.id==='suicide'&&val){
+        const prev=CDC_2022[name], chg=prev?((val-prev)/prev*100).toFixed(1):null;
+        const col=chg>0?'#f87171':'#34d399', arrow=chg>0?'▲':'▼';
+        extra=`<hr class="t-divider">
+          <span class="t-rank" style="color:${col}">${arrow} ${Math.abs(chg)}% vs 2022 (was ${prev}/100k)</span>
+          <canvas id="tip-spark" width="200" height="44" style="display:block;margin-top:5px"></canvas>`;
+      }
+
+      tooltip.innerHTML=`
+        <span class="t-state">${name}</span>
+        <span class="t-val" style="color:${active.color}">${val>0?active.format(val):'No data'} ${val>0?active.unit:''}</span>
+        ${rank?`<br><span class="t-rank">Ranked #${rank} of ${sorted.length}</span>`:''}
+        ${extra}`;
+
+      if(active.id==='suicide'){
+        requestAnimationFrame(()=>{
+          const cv=document.getElementById('tip-spark'); if(!cv) return;
+          const ctx=cv.getContext('2d'),W=cv.width,H=cv.height,p=4;
+          const rates=TREND.map(d=>d.rate),mn=Math.min(...rates)-0.5,mx=Math.max(...rates)+0.5;
+          const xs=i=>p+(i/(TREND.length-1))*(W-p*2), ys=r=>H-p-((r-mn)/(mx-mn))*(H-p*2);
+          ctx.clearRect(0,0,W,H);
+          ctx.beginPath(); ctx.moveTo(xs(0),ys(rates[0]));
+          TREND.forEach((d,i)=>ctx.lineTo(xs(i),ys(d.rate)));
+          ctx.lineTo(xs(TREND.length-1),H); ctx.lineTo(xs(0),H); ctx.closePath();
+          ctx.fillStyle='rgba(248,113,113,0.12)'; ctx.fill();
+          ctx.beginPath(); ctx.moveTo(xs(0),ys(rates[0]));
+          TREND.forEach((d,i)=>ctx.lineTo(xs(i),ys(d.rate)));
+          ctx.strokeStyle='#f87171'; ctx.lineWidth=1.5; ctx.stroke();
+          const li=TREND.length-1;
+          ctx.beginPath(); ctx.arc(xs(li),ys(rates[li]),3,0,Math.PI*2);
+          ctx.fillStyle='#f87171'; ctx.fill();
+          ctx.fillStyle='#555'; ctx.font='9px monospace';
+          ctx.fillText('2003',xs(0)-2,H-1); ctx.fillText('2023',xs(li)-10,H-1);
+        });
+      }
+    })
+    .on("mouseleave",()=>tooltip.style.opacity=0);
+
+  drawLegend(active);
+}
+
+d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(us=>{
+  features=topojson.feature(us,us.objects.states).features;
+  features.forEach(f=>f.properties.name=STATE_IDS[f.id.toString().padStart(2,'0')]||"");
+  svg.selectAll(".state").data(features).join("path").attr("class","state").attr("d",geoPath);
+  render();
+});
+
+document.getElementById('btn-log').addEventListener('click',()=>{
+  useLog=true; document.getElementById('btn-log').classList.add('active');
+  document.getElementById('btn-linear').classList.remove('active'); render();});
+document.getElementById('btn-linear').addEventListener('click',()=>{
+  useLog=false; document.getElementById('btn-linear').classList.add('active');
+  document.getElementById('btn-log').classList.remove('active'); render();});
+
+buildCards();
+</script>
+</body>
+</html>
