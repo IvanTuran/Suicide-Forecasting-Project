@@ -45,7 +45,11 @@ The project focuses on regional forecasting rather than individual prediction. T
 
 ## Key Results
 
-The hybrid forecasting framework demonstrated stronger explanatory performance than both linguistic-only and socioeconomic-only approaches.
+The hybrid forecasting framework demonstrated stronger explanatory performance than both linguistic-only and socioeconomic-only approaches, highlighting the importance of integrating behavioral and structural indicators within population-level suicide forecasting systems.
+
+Rather than treating socioeconomic conditions or online behavioral distress as isolated predictors, this project explored how combining these domains may provide a more complete representation of regional psychological vulnerability. Structural socioeconomic indicators capture long-term contextual vulnerability, while linguistic distress signals derived from social media provide more dynamic insight into rapidly evolving emotional and behavioral conditions occurring across populations.
+
+The results suggest that hybrid behavioral-socioeconomic forecasting frameworks may represent a promising direction for future computational public health surveillance systems.
 
 The linguistic distress classifier achieved:
 
@@ -60,7 +64,7 @@ Additional analyses included:
 - Moran’s I spatial autocorrelation analysis
 - state-level geospatial visualization using QGIS
 
-The results suggest that online behavioral distress signals may provide useful supplementary insight into regional psychological vulnerability patterns.
+SHAP analysis further demonstrated that behavioral distress features contributed substantially within the hybrid framework, while geospatial analyses revealed meaningful regional variation between structural socioeconomic conditions and behavioral distress patterns across states.
 
 ---
 
@@ -72,7 +76,9 @@ This repository also includes an interactive dashboard for:
 - hybrid risk forecasting
 - comparative geographic analysis
 
-The dashboard was designed to make model outputs more interpretable and accessible within a public health forecasting context.
+The dashboard was developed to translate machine learning outputs into a more interpretable and actionable public health framework. In addition to visualizing predicted regional vulnerability, the system integrates behavioral distress metrics with socioeconomic indicators to support comparative state-level analysis and intervention-oriented interpretation.
+
+The dashboard also serves as a demonstration of how hybrid forecasting systems could eventually support more responsive and data-informed public health monitoring infrastructure.
 
 ---
 
