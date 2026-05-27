@@ -79,8 +79,9 @@ The dashboard was designed to make model outputs more interpretable and accessib
 ## Repository Structure
 
 ```bash
-data/           # Processed datasets
-scripts/        # NLP, ML, SHAP, and analysis scripts
-dashboard/      # Interactive dashboard files
-figures/        # Figures used in the manuscript
-paper/          # Manuscript and supplementary materials
+data/             #Processed datasets
+linguistic_model/ # Scripts for the Linguistic Model
+hybrid_model/     # Scripts for the Hybrid Model
+dashboard/        # Interactive dashboard files
+figures/          # Figures used in the manuscript
+paper/            # Manuscript and supplementary materials
