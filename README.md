@@ -84,4 +84,3 @@ linguistic_model/ # Scripts for the Linguistic Model
 hybrid_model/     # Scripts for the Hybrid Model
 dashboard/        # Interactive dashboard files
 figures/          # Figures used in the manuscript
-paper/            # Manuscript and supplementary materials
