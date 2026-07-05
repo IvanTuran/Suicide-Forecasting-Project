@@ -82,6 +82,14 @@ The dashboard also serves as a demonstration of how hybrid forecasting systems c
 
 ---
 
+## Supplementary Figures
+
+Supplementary Figure S1: Nationwide geolocation distribution of suicide-related Reddit posts after geographic filtering and preprocessing. This figure is included as supporting material because the main manuscript focuses on state-level aggregated distress metrics rather than individual post locations.
+
+File: `figures/Nationwide Geolocation of Suicide-Related Reddit Posts.png`
+
+---
+
 ## Repository Structure
 
 ```bash
